@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>Physijs + THREE.js = Simple Cloth Demo</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				font-family: Monospace;
+				background-color: #000;
+				color: #fff;
+				margin: 0px;
+				overflow: hidden;
+			}
+			#info {
+				color: #fff;
+				position: absolute;
+				top: 10px;
+				width: 100%;
+				text-align: center;
+				z-index: 100;
+				display:block;
+			}
+			#info a, .button { color: #f00; font-weight: bold; text-decoration: underline; cursor: pointer }
+		</style>
+	</head>
+
+	<body> 
+
+		<script src="js/three.js"></script> 
+		<script type="text/javascript" src="js/physi.js"></script> 
+		<script src="js/controls/OrbitControls.js"></script>
+		
+		<script>
+
+		 'use strict';
+
+			Physijs.scripts.worker = 'js/physijs_worker.js';
+			Physijs.scripts.ammo = 'ammo.js';
+			
+			var initScene, render, renderer, scene, camera, box1, box2, floor, constraint, mouseSphere, mouseJoint, line;
+			 
+			var container;
+
+			var camera, scene, controls, renderer;
+ 
+
+			var mouseCoords = new THREE.Vector2();
+			var raycaster = new THREE.Raycaster();
+			
+			var windowHalfX = window.innerWidth / 2;
+			var windowHalfY = window.innerHeight / 2;
+			var clock = new THREE.Clock();
+
+			var ballMaterial = new THREE.MeshPhongMaterial( { color: 0x202020 } );
+			var pos = new THREE.Vector3();
+			var quat = new THREE.Quaternion();
+			
+			init();
+			animate();
+
+			var mouseX = 0, mouseY = 0, mouseZ=0;
+			 
+
+			function init() {
+
+				container = document.createElement( 'div' );
+				document.body.appendChild( container );
+
+				camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 0.1, 10000 );
+				
+				camera.position.z = 20;
+				camera.position.y = 5;
+				
+				controls = new THREE.OrbitControls( camera );
+				 
+			
+				// scene  
+				scene = new Physijs.Scene;
+				scene.setGravity(new THREE.Vector3( 0, -10, 0 ));
+				scene.background = new THREE.Color( 0xCCCCCC );
+ 
+ 
+				mouseSphere = new Physijs.SphereMesh( 
+					new THREE.SphereGeometry( 0.1, 10, 10 ), 
+					new THREE.MeshPhongMaterial({color:0x00ff00}),
+					0
+				);
+				 
+				scene.add(mouseSphere); 
+				mouseSphere.visible = false;
+				
+				//floor
+				floor = new Physijs.BoxMesh(
+					new THREE.CubeGeometry( 20, 0.1, 20 ),
+					new THREE.MeshPhongMaterial({ color:0xffffff}), 
+					0 //mass
+				);
+				floor.receiveShadow = true;
+				floor.position.set(0,0,0);
+				
+				scene.add( floor ); 
+				
+
+				// Add a static Box
+				var geom = new THREE.CubeGeometry( 1, 1, 1 );
+				var mat = new THREE.MeshPhongMaterial({ color:0xffffff});
+				 
+				var manager = new THREE.LoadingManager();
+				manager.onProgress = function ( item, loaded, total ) {
+					console.log( item, loaded, total );
+				};
+				var loader = new THREE.ImageLoader( manager );
+				var crateTexture = new THREE.Texture();
+				 
+				loader.load( 'textures/crate.jpg', function ( image ) { 
+					crateTexture.image = image;
+					crateTexture.needsUpdate = true; 
+					mat.map = crateTexture;			
+
+					box1 = new Physijs.BoxMesh(
+						geom,
+						mat,
+						0	//mass
+					);
+					box1.position.y = 6; 
+					scene.add( box1 ); 				
+					box1.castShadow = true;
+					
+					// Add a dynamic Box
+					box2 = new Physijs.BoxMesh(
+						geom,
+						mat 
+					);
+					box2.position.y = 3; 
+					scene.add( box2 ); 				
+					box2.castShadow = true;
+					
+					//create a point to point constraint between the two boxes
+					constraint = new Physijs.PointConstraint(
+						box2, // First object to be constrained
+						box1, // OPTIONAL second object - if omitted then physijs_mesh_1 will be constrained to the scene
+						box1.position // point in the scene to apply the constraint
+					);
+					scene.addConstraint( constraint );
+
+					var material = new THREE.LineBasicMaterial({	color: 0x0000ff	});
+					var geometry = new THREE.Geometry();
+					geometry.vertices.push(box1.position);
+					geometry.vertices.push(box2.position);
+					line = new THREE.Line(geometry, material);
+					scene.add(line); 
+					
+				} );
+				
+				 
+				
+				var ambientLight = new THREE.AmbientLight( 0x707070 );
+				scene.add( ambientLight );
+
+				var light = new THREE.DirectionalLight( 0xffffff, 1 );
+				light.position.set( -10, 18, 5 );
+				light.castShadow = true;
+				var d = 14;
+				light.shadow.camera.left = -d;
+				light.shadow.camera.right = d;
+				light.shadow.camera.top = d;
+				light.shadow.camera.bottom = -d;
+
+				light.shadow.camera.near = 2;
+				light.shadow.camera.far = 50;
+
+				light.shadow.mapSize.x = 1024;
+				light.shadow.mapSize.y = 1024;
+
+				scene.add( light );
+				
+					//
+
+				renderer = new THREE.WebGLRenderer();
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				renderer.shadowMap.enabled = true;
+				container.appendChild( renderer.domElement );
+
+				container.appendChild( renderer.domElement );
+
+				document.addEventListener( 'mousemove', onDocumentMouseMove, false ); 
+				window.addEventListener( 'resize', onWindowResize, false );
+				window.addEventListener( 'mousedown', onMouseDown, false ); 
+				window.addEventListener( 'mouseup', onMouseUp, false);
+				
+			}
+
+			function onWindowResize() {
+
+				windowHalfX = window.innerWidth / 2;
+				windowHalfY = window.innerHeight / 2;
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+			}
+			
+			function onMouseUp( event ) {
+				if(mouseJoint != undefined) {
+					scene.removeConstraint(mouseJoint); 
+					mouseSphere.visible = false;
+					mouseJoint = undefined;  
+				}
+				// to disable rotation
+				controls.enableRotate = true;
+				
+			}
+
+			function onMouseDown(event) { 
+
+				mouseCoords.set(
+					( event.clientX / window.innerWidth ) * 2 - 1,
+					- ( event.clientY / window.innerHeight ) * 2 + 1
+				);
+ 
+ 
+				//cast a ray into the scene to see if we have hit a rigid body
+				raycaster.setFromCamera( mouseCoords, camera );
+				
+				// calculate objects intersecting the picking ray
+				var intersects = raycaster.intersectObjects( scene.children );
+ 
+				if(intersects.length > 0) {
+					mouseSphere.visible = true;
+					var pickPos = intersects[ 0 ].point;
+					
+					var wp = new THREE.Vector3(pickPos.x, pickPos.y, pickPos.z);
+					wp.project(camera);
+					mouseZ = wp.z;
+					
+					mouseSphere.position.set( pickPos.x, pickPos.y, pickPos.z );
+					mouseSphere.__dirtyPosition = true;
+					
+					var pickedBody = intersects[ 0 ].object;
+					 
+					mouseJoint = new Physijs.PointConstraint(pickedBody, mouseSphere, pickPos); 
+					scene.addConstraint(mouseJoint);  
+					
+					// to disable rotation
+					controls.enableRotate = (pickedBody._physijs.mass==0);
+				}
+			}
+			
+			function onDocumentMouseMove( event ) { 
+				 
+ 				
+				mouseCoords.set(
+					( event.clientX / window.innerWidth ) * 2 - 1,
+					- ( event.clientY / window.innerHeight ) * 2 + 1
+				);
+					
+				if(mouseJoint !== undefined ) { 
+				 
+					var wp = new THREE.Vector3(mouseCoords.x, mouseCoords.y, mouseZ);
+					wp.unproject(camera);  
+					mouseSphere.position.set(wp.x, wp.y, wp.z);
+					mouseSphere.__dirtyPosition = true;
+					 
+				}  
+				
+			}
+ 
+			function animate() {
+				
+				requestAnimationFrame( animate );
+				render();
+
+			}
+
+			function render() {
+				
+				var deltaTime = clock.getDelta();
+				
+				controls.update(deltaTime);
+				scene.simulate(); // run physics
+				if(line !== undefined) {
+					line.geometry.vertices[1].position = box2.position;
+					line.geometry.verticesNeedUpdate = true;
+				}
+				camera.lookAt( scene.position );
+
+				renderer.render( scene, camera );
+
+			}
+
+		</script>
+
+	</body>
+</html>

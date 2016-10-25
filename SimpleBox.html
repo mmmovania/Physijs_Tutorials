@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>Physijs + THREE.js = Simple Box Demo</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				font-family: Monospace;
+				background-color: #000;
+				color: #fff;
+				margin: 0px;
+				overflow: hidden;
+			}
+			#info {
+				color: #fff;
+				position: absolute;
+				top: 10px;
+				width: 100%;
+				text-align: center;
+				z-index: 100;
+				display:block;
+			}
+			#info a, .button { color: #f00; font-weight: bold; text-decoration: underline; cursor: pointer }
+		</style>
+	</head>
+
+	<body> 
+
+		<script src="js/three.js"></script> 
+		<script type="text/javascript" src="js/physi.js"></script> 
+		<script src="js/controls/OrbitControls.js"></script>
+		
+		<script>
+
+		 'use strict';
+
+			Physijs.scripts.worker = 'js/physijs_worker.js';
+			Physijs.scripts.ammo = 'ammo.js';
+			
+			var initScene, render, renderer, scene, camera, box, floor;
+			 
+			var container;
+
+			var camera, scene, controls, renderer;
+
+			var mouseX = 0, mouseY = 0;
+
+			var windowHalfX = window.innerWidth / 2;
+			var windowHalfY = window.innerHeight / 2;
+			var clock = new THREE.Clock();
+
+			init();
+			animate();
+
+
+			function init() {
+
+				container = document.createElement( 'div' );
+				document.body.appendChild( container );
+
+				camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 0.1, 10000 );
+				
+				camera.position.z = 20;
+				camera.position.y = 5;
+				
+				controls = new THREE.OrbitControls( camera );
+				 
+			
+				// scene
+
+				//scene = new THREE.Scene();
+				scene = new Physijs.Scene;
+				scene.setGravity(new THREE.Vector3( 0, -10, 0 ));
+								
+				//floor
+				floor = new Physijs.BoxMesh(
+					new THREE.CubeGeometry( 20, 0.1, 20 ),
+					new THREE.MeshPhongMaterial({ color:0xffffff}), 
+					0 //mass
+				);
+				floor.receiveShadow = true;
+				floor.position.set(0,0,0);
+				
+				scene.add( floor ); 
+				
+
+				// Box
+				box = new Physijs.BoxMesh(
+					new THREE.CubeGeometry( 1, 1, 1 ),
+					new THREE.MeshPhongMaterial({ color:0xffffff}) 
+				);
+				box.position.y = 10; 
+				scene.add( box ); 				
+				box.castShadow = true;
+				
+				var manager = new THREE.LoadingManager();
+				manager.onProgress = function ( item, loaded, total ) {
+					console.log( item, loaded, total );
+				};
+				var loader = new THREE.ImageLoader( manager );
+				var crateTexture = new THREE.Texture();
+				 
+				loader.load( 'textures/crate.jpg', function ( image ) { 
+					crateTexture .image = image;
+					crateTexture .needsUpdate = true; 
+					box.material.map = crateTexture ;
+				} );
+				
+				 
+				
+				var ambientLight = new THREE.AmbientLight( 0x707070 );
+				scene.add( ambientLight );
+
+				var light = new THREE.DirectionalLight( 0xffffff, 1 );
+				light.position.set( -10, 18, 5 );
+				light.castShadow = true;
+				var d = 14;
+				light.shadow.camera.left = -d;
+				light.shadow.camera.right = d;
+				light.shadow.camera.top = d;
+				light.shadow.camera.bottom = -d;
+
+				light.shadow.camera.near = 2;
+				light.shadow.camera.far = 50;
+
+				light.shadow.mapSize.x = 1024;
+				light.shadow.mapSize.y = 1024;
+
+				scene.add( light );
+				
+					//
+
+				renderer = new THREE.WebGLRenderer();
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				renderer.shadowMap.enabled = true;
+				container.appendChild( renderer.domElement );
+
+				container.appendChild( renderer.domElement );
+
+				document.addEventListener( 'mousemove', onDocumentMouseMove, false ); 
+				window.addEventListener( 'resize', onWindowResize, false );
+
+			}
+
+			function onWindowResize() {
+
+				windowHalfX = window.innerWidth / 2;
+				windowHalfY = window.innerHeight / 2;
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+			}
+
+			function onDocumentMouseMove( event ) {
+
+				mouseX = ( event.clientX - windowHalfX ) / 2;
+				mouseY = ( event.clientY - windowHalfY ) / 2;
+
+			}
+
+			//
+
+			function animate() {
+
+				requestAnimationFrame( animate );
+				render();
+
+			}
+
+			function render() {
+				var deltaTime = clock.getDelta();
+				controls.update(deltaTime);
+				scene.simulate(); // run physics
+				 
+				camera.lookAt( scene.position );
+
+				renderer.render( scene, camera );
+
+			}
+
+		</script>
+
+	</body>
+</html>

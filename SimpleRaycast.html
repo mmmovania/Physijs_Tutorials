@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>Physijs + THREE.js = Simple Raycast Demo</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				font-family: Monospace;
+				background-color: #000;
+				color: #fff;
+				margin: 0px;
+				overflow: hidden;
+			}
+			#info {
+				color: #fff;
+				position: absolute;
+				top: 10px;
+				width: 100%;
+				text-align: center;
+				z-index: 100;
+				display:block;
+			}
+			#info a, .button { color: #f00; font-weight: bold; text-decoration: underline; cursor: pointer }
+		</style>
+	</head>
+
+	<body> 
+
+		<script src="js/three.js"></script> 
+		<script type="text/javascript" src="js/physi.js"></script> 
+		<script src="js/controls/OrbitControls.js"></script>
+		
+		<script>
+
+		 'use strict';
+
+			Physijs.scripts.worker = 'js/physijs_worker.js';
+			Physijs.scripts.ammo = 'ammo.js';
+			
+			var initScene, render, renderer, scene, camera, box1, box2, floor;
+			 
+			var container;
+
+			var camera, scene, controls, renderer;
+ 
+
+			var mouseCoords = new THREE.Vector2();
+			var raycaster = new THREE.Raycaster();
+			
+			var windowHalfX = window.innerWidth / 2;
+			var windowHalfY = window.innerHeight / 2;
+			var clock = new THREE.Clock();
+
+			var ballMaterial = new THREE.MeshPhongMaterial( { color: 0x202020 } );
+			var pos = new THREE.Vector3();
+			var quat = new THREE.Quaternion();
+			
+			init();
+			animate();
+
+
+			function init() {
+
+				container = document.createElement( 'div' );
+				document.body.appendChild( container );
+
+				camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 0.1, 10000 );
+				
+				camera.position.z = 20;
+				camera.position.y = 5;
+				
+				controls = new THREE.OrbitControls( camera );
+				 
+			
+				// scene
+
+				//scene = new THREE.Scene();
+				scene = new Physijs.Scene;
+				scene.setGravity(new THREE.Vector3( 0, -10, 0 ));
+								
+				//floor
+				floor = new Physijs.BoxMesh(
+					new THREE.CubeGeometry( 20, 0.1, 20 ),
+					new THREE.MeshPhongMaterial({ color:0xffffff}), 
+					0 //mass
+				);
+				floor.receiveShadow = true;
+				floor.position.set(0,0,0);
+				
+				scene.add( floor ); 
+				
+
+				// Add a static Box
+				box1 = new Physijs.BoxMesh(
+					new THREE.CubeGeometry( 1, 1, 1 ),
+					new THREE.MeshPhongMaterial({ color:0xffffff}),
+					0	//mass
+				);
+				box1.position.y = 6; 
+				scene.add( box1 ); 				
+				box1.castShadow = true;
+				
+				// Add a dynamic Box
+				box2 = new Physijs.BoxMesh(
+					new THREE.CubeGeometry( 1, 1, 1 ),
+					new THREE.MeshPhongMaterial({ color:0xffffff}) 
+				);
+				box2.position.y = 3; 
+				scene.add( box2 ); 				
+				box2.castShadow = true;
+				
+				//create a point to point constraint between the two boxes
+				var constraint = new Physijs.PointConstraint(
+					box2, // First object to be constrained
+					box1, // OPTIONAL second object - if omitted then physijs_mesh_1 will be constrained to the scene
+					new THREE.Vector3( 0, 1, 0 ) // point in the scene to apply the constraint
+				);
+				scene.addConstraint( constraint );
+
+				var manager = new THREE.LoadingManager();
+				manager.onProgress = function ( item, loaded, total ) {
+					console.log( item, loaded, total );
+				};
+				var loader = new THREE.ImageLoader( manager );
+				var crateTexture = new THREE.Texture();
+				 
+				loader.load( 'textures/crate.jpg', function ( image ) { 
+					crateTexture.image = image;
+					crateTexture.needsUpdate = true; 
+					box1.material.map = crateTexture;
+					box2.material.map = crateTexture;
+				} );
+				
+				 
+				
+				var ambientLight = new THREE.AmbientLight( 0x707070 );
+				scene.add( ambientLight );
+
+				var light = new THREE.DirectionalLight( 0xffffff, 1 );
+				light.position.set( -10, 18, 5 );
+				light.castShadow = true;
+				var d = 14;
+				light.shadow.camera.left = -d;
+				light.shadow.camera.right = d;
+				light.shadow.camera.top = d;
+				light.shadow.camera.bottom = -d;
+
+				light.shadow.camera.near = 2;
+				light.shadow.camera.far = 50;
+
+				light.shadow.mapSize.x = 1024;
+				light.shadow.mapSize.y = 1024;
+
+				scene.add( light );
+				
+					//
+
+				renderer = new THREE.WebGLRenderer();
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				renderer.shadowMap.enabled = true;
+				container.appendChild( renderer.domElement );
+
+				container.appendChild( renderer.domElement );
+
+				document.addEventListener( 'mousemove', onDocumentMouseMove, false ); 
+				window.addEventListener( 'resize', onWindowResize, false );
+				window.addEventListener( 'mousedown', onMouseDown, false ); 
+			}
+
+			function onWindowResize() {
+
+				windowHalfX = window.innerWidth / 2;
+				windowHalfY = window.innerHeight / 2;
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+			}
+
+			function onMouseDown(event) { 
+
+				mouseCoords.set(
+					( event.clientX / window.innerWidth ) * 2 - 1,
+					- ( event.clientY / window.innerHeight ) * 2 + 1
+				);
+
+				raycaster.setFromCamera( mouseCoords, camera );
+
+			 
+				// Creates a ball and throws it
+				var ballMass = 35;
+				var ballRadius = 0.4;
+
+				
+				
+				var ball = new Physijs.SphereMesh( 
+					new THREE.SphereGeometry( ballRadius, 14, 10 ), 
+					ballMaterial,
+					ballMass
+				);
+				
+				ball.castShadow = true;
+				ball.receiveShadow = true;
+				
+				ball.position.copy(raycaster.ray.direction);
+				ball.position.add(raycaster.ray.origin);
+				
+				
+				pos.copy( raycaster.ray.direction );
+				pos.multiplyScalar( 80 );
+				ball.setLinearVelocity( new Ammo.btVector3( pos.x, pos.y, pos.z ) );
+				
+				scene.add(ball);
+				
+				//var ballShape = new Ammo.btSphereShape( ballRadius );
+				//ballShape.setMargin( margin );
+				//pos.copy( raycaster.ray.direction );
+				//pos.add( raycaster.ray.origin );
+				//quat.set( 0, 0, 0, 1 );
+				//var ballBody = createRigidBody( ball, ballShape, ballMass, pos, quat );
+				
+				//pos.copy( raycaster.ray.direction );
+				//pos.multiplyScalar( 80 );
+				//ballBody.setLinearVelocity( new Ammo.btVector3( pos.x, pos.y, pos.z ) );
+
+			
+			}
+			
+			function onDocumentMouseMove( event ) { 
+				
+				//clear all materials to white
+				for ( var i = 0; i < scene.children.length; i++ ) {
+					if(scene.children[i] instanceof THREE.Mesh) {
+						scene.children[ i ].material.color.set( 0xffffff );				
+					}
+				}
+				
+				mouseCoords.set(
+					( event.clientX / window.innerWidth ) * 2 - 1,
+					- ( event.clientY / window.innerHeight ) * 2 + 1
+				);
+
+				raycaster.setFromCamera( mouseCoords, camera );
+				
+				// calculate objects intersecting the picking ray
+				var intersects = raycaster.intersectObjects( scene.children );
+
+				intersects[ 0 ].object.material.color.set( 0xff0000 );				
+				
+				
+			}
+
+			//
+
+			function animate() {
+
+				requestAnimationFrame( animate );
+				render();
+
+			}
+
+			function render() {
+				var deltaTime = clock.getDelta();
+				controls.update(deltaTime);
+				scene.simulate(); // run physics
+				 
+				camera.lookAt( scene.position );
+
+				renderer.render( scene, camera );
+
+			}
+
+		</script>
+
+	</body>
+</html>
