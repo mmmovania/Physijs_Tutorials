@@ -55,10 +55,8 @@
 			init();
 			animate();
 
-			function addBall(pos) {
-				// cube maps for all spheres
-				var cubeCamera = new THREE.CubeCamera( 0.1, 100, 256 );
-				cubeCamera.renderTarget.texture.minFilter = THREE.LinearMipMapLinearFilter;
+			function addBall(pos, texture) {
+				 
 				// shared sphere geometry
 				var geometry = new THREE.SphereGeometry( 1, 32, 32 );
 			
@@ -67,7 +65,7 @@
 				var restitution = 0.8; // low restitution
 
 				var material = Physijs.createMaterial(
-					new THREE.MeshPhongMaterial( {color: 0xff0000, envMap: cubeCamera.renderTarget.texture, reflectivity:0.4, shininess:1000} ),
+					new THREE.MeshPhongMaterial( {color: 0xff0000, map: texture} ),
 					friction,
 					restitution
 				);
@@ -79,22 +77,8 @@
 				//ball.setDamping(linearDamping, angularDamping);
 
 				ball.position.copy(pos);
- 				ball.castShadow = true;
-				ball.add(cubeCamera); 
-				scene.add( ball );
-				
-				ball.visible = false;
-					cubeCamera.updateCubeMap( renderer, scene );
-				ball.visible = true;
-					
-				scene.addEventListener( 'update', function() { 
-					ball.visible = false;
-					cubeCamera.position.copy(ball.position);
-					 
-					ball.rotation.set(0,0,0); 
-					cubeCamera.updateCubeMap( renderer, scene );
-					ball.visible = true;  
-				});
+ 				ball.castShadow = true; 
+				scene.add( ball ); 
 			}
 
 			function init() {
@@ -117,10 +101,9 @@
 								
 				
 				
-
-				// Box
-				 
+ 
 				var texture = new THREE.Texture();
+				var texture2 = new THREE.Texture();
 				var manager = new THREE.LoadingManager();
 				manager.onProgress = function ( item, loaded, total ) {
 					console.log( item, loaded, total );
@@ -152,9 +135,16 @@
 					floor.position.set(0,0,0);
 					scene.add( floor ); 
 				
-					addBall(new THREE.Vector3(0,2,0));
 				} );
 				
+				loader.load( 'textures/basket_ball.jpg', function ( image ) {
+					texture2.image = image; 
+					texture2.needsUpdate = true;
+					
+					addBall(new THREE.Vector3(0,5,0), texture2);
+				
+				} );
+					
 				 
 				
 				var ambientLight = new THREE.AmbientLight( 0x707070 );
