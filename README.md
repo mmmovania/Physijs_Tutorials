@@ -9,7 +9,7 @@ Demo Screenshots
 Here are a few snapshots of the tutorial demos.
 
 Simple Box: Shows how to add a single rigid body
-[Live Demo](https://rawgit/com/mmmovania/master/SimpleBox.html)
+[Live Demo](https://rawgit.com/mmmovania/master/SimpleBox.html)
 ![alt text](images/SimpleBox.png "Simple Box")
 
 Multiple Boxes: Shows how to add multiple rigid bodies
